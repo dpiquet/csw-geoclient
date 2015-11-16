@@ -53,6 +53,7 @@ class cswGeoClient {
 
         try {
             $resp= $request->send();
+            //if (200 == $resp->getStatus()) {
             if (200 == $resp->getStatus()) {
               $this->_response = $resp->getBody();
               $cookies = $resp->getCookies();
@@ -71,6 +72,30 @@ class cswGeoClient {
 
     }
 
+	/**
+	 * Geosource 3 always redirect client after login
+	 * @return bool Request success / error
+	 */
+	private function _callHTTPAuth($request) {
+		try {
+			$resp = $request->send();
+			if (301 == $resp->getStatus() or 302 == $resp->getStatus()) {
+				//TODO: check for failed login
+				$cookies = $resp->getCookies();
+				foreach ($cookies as $cook) {
+					if ($cook['name']=='JSESSIONID') $this->_sessionID = $cook['value'];
+				}
+				return true;
+			}
+			else {
+				$this->_response = $resp->getStatus() . ' ' .$resp->getReasonPhrase();
+				return false;
+			}
+		} catch (HTTP_REQUEST2_Exception $e) {
+			$this->_response = 'Error: ' . $e->getMessage();
+		}
+	}
+
     /**
      *
      * @return bool authentication success or error
@@ -79,17 +104,20 @@ class cswGeoClient {
         //only available for Geosource and Geonetwork
         //start by logout
         if ($this->_bAuthent) {
-            $req = new HTTP_Request2($this->_authentAddress.'/xml.user.logout', HTTP_Request2::METHOD_POST);
+            //$req = new HTTP_Request2($this->_authentAddress.'/xml.user.logout', HTTP_Request2::METHOD_POST);
+            $req = new HTTP_Request2($this->_authentAddress.'/j_spring_security_logout', HTTP_Request2::METHOD_POST);
 
-            if ($this->_callHTTPCSW($req)) {
+            //if ($this->_callHTTPCSW($req)) {
+            if ($this->_callHTTPAuth($req)) {
                 //success so next step
                 //start to login
-                $req = new HTTP_Request2( $this->_authentAddress.'/xml.user.login');
+                //$req = new HTTP_Request2( $this->_authentAddress.'/xml.user.login');
+                $req = new HTTP_Request2( $this->_authentAddress.'/j_spring_security_check');
                 $req->setMethod(HTTP_Request2::METHOD_POST)
                         ->setHeader("'Content-type': 'application/x-www-form-urlencoded', 'Accept': 'text/plain'")
                         ->addPostParameter('username', $this->_cswLogin)
                         ->addPostParameter('password', $this->_cswPassword);
-                if ($this->_callHTTPCSW($req)) {
+                if ($this->_callHTTPAuth($req)) {
                     $request->addCookie('JSESSIONID', $this->_sessionID);
                     return true;
                 }
@@ -98,6 +126,33 @@ class cswGeoClient {
         }
         return true;
     }
+
+	/**
+	 * retrieve csw repository capabilities
+	 * @return XML content
+	 */
+	public function getCapabilities() {
+		$getCapRequest = new HTTP_Request2($this->_cswAddress);
+		$getCapRequest->setMethod(HTTP_Request2::METHOD_POST)
+			->setHeader('Content-type: text/xml; charset=utf-8')
+			->setBody('<?xml version="1.0"?>'.
+					'<csw:GetCapabilities xmlns:csw="http://www.opengis.net/cat/csw/2.0.2" service="CSW">'.
+						'<ows:AcceptVersions xmlns:ows="http://www.opengis.net/ows">'.
+							'<ows:Version>2.0.2</ows:Version>'.
+						'</ows:AcceptVersions>'.
+						'<ows:AcceptFormats xmlns:ows="http://www.opengis.net/ows">'.
+							'<ows:OutputFormat>application/xml</ows:OutputFormat>'.
+						'</ows:AcceptFormats>'.
+					'</csw:GetCapabilities>')
+			;
+		$this->_authentication($getCapRequest);
+		if($this->_callHTTPCSW($getCapRequest)) {
+			return $this->_response;
+		}
+		else {
+			throw new Exception($this->_response, "002");
+		}
+	}
 
     /**
      * retrieve a specific metadata with UUID in GeoNetwork / Geosource
@@ -284,7 +339,9 @@ class cswGeoClient {
 
     }
     /**
-     * Insert a new metadata in the csw server
+	 * Insert a new metadata in the csw server
+	 * TODO: better xml header removal
+	 *
      * @param DOMDocument $xmlISO19139 content to add
      * @return number of insered metadata
      */
@@ -294,7 +351,7 @@ class cswGeoClient {
                       ->setHeader('Content-type: text/xml; charset=utf-8')
 		      ->setBody("<?xml version='1.0'?>".
                            "<csw:Transaction service='CSW' version='2.0.2' xmlns:csw='http://www.opengis.net/cat/csw/2.0.2' xmlns:ogc='http://www.opengis.net/ogc' xmlns:apiso='http://www.opengis.net/cat/csw/apiso/1.0'>".
-                           "<csw:Insert>".str_replace('<?xml version="1.0"?>','',$xmlISO19139->saveXML()).
+                           "<csw:Insert>".str_replace('<?xml version="1.0" encoding="UTF-8"?>','',$xmlISO19139->saveXML()).
 		           "</csw:Insert>".
                            "</csw:Transaction>");
         //authentication is needed !!
@@ -303,12 +360,17 @@ class cswGeoClient {
                 $docXml= new DOMDocument();
                 if ($docXml->loadXML($this->_response)) {
                     $xp = new DOMXPath($docXml);
-                    $xpathString="//csw:totalInserted";
+                    $xpathString="//csw:BriefRecord";
                     $nodes = $xp->query($xpathString);
-                    if ($nodes->length==1)
-                        return $nodes->item(0)->textContent;
+					if ($nodes->length > 0) {
+						$uuids = array();
+						foreach($nodes as $node) {
+							$uuids[] = str_replace(' ', '', $node->textContent);
+						}
+						return $uuids;
+					}
                     else
-                        return 0;
+                        return false;
                 }
                 else {
                     throw new Exception($this->_response, "004");
