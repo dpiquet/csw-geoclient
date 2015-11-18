@@ -150,7 +150,7 @@ class cswGeoClient {
 			return $this->_response;
 		}
 		else {
-			throw new Exception($this->_response, "002");
+			throw new Exception($this->_response);
 		}
 	}
 
@@ -169,14 +169,14 @@ class cswGeoClient {
                            "<csw:Id>".$id."</csw:Id>".
                            "</csw:GetRecordById>");
             //authentication if needed
-        if (!$this->_authentication($getRecodByIDRequest)) throw new Exception($this->_response, "001");
+        if (!$this->_authentication($getRecodByIDRequest)) throw new Exception($this->_response);
         if ($this->_callHTTPCSW($getRecodByIDRequest)) {
                 $getRecodByIDRequest=null;
                 return $this->_response;
         }
         else {
             $getRecodByIDRequest=null;
-            throw new Exception($this->_response, "002");
+            throw new Exception($this->_response);
         }
         
     }
@@ -210,14 +210,14 @@ class cswGeoClient {
             //authentication if needed
             //
 			
-        if (!$this->_authentication($getRecodsRequest)) throw new Exception($this->_response, "001");
+        if (!$this->_authentication($getRecodsRequest)) throw new Exception($this->_response);
         if ($this->_callHTTPCSW($getRecodsRequest)) {
                 $getRecodsRequest=null;
                 return $this->_response;
         }
         else {
             $getRecodsRequest=null;
-            throw new Exception($this->_response, "002");
+            throw new Exception($this->_response);
         }
     }
     
@@ -238,14 +238,14 @@ class cswGeoClient {
                            "</Filter></csw:Constraint></csw:Query></csw:GetRecords>");
             //authentication if needed
             //
-        if (!$this->_authentication($getRecodsRequest)) throw new Exception($this->_response, "001");
+        if (!$this->_authentication($getRecodsRequest)) throw new Exception($this->_response);
         if ($this->_callHTTPCSW($getRecodsRequest)) {
                 $getRecodsRequest=null;
                 return $this->_response;
         }
         else {
             $getRecodsRequest=null;
-            throw new Exception($this->_response, "002");
+            throw new Exception($this->_response);
         }
     }
     
@@ -277,16 +277,70 @@ class cswGeoClient {
                            "</Filter></csw:Constraint></csw:Query></csw:GetRecords>");
             //authentication if needed
             //
-        if (!$this->_authentication($getRecodsRequest)) throw new Exception($this->_response, "001");
+        if (!$this->_authentication($getRecodsRequest)) throw new Exception($this->_response);
         if ($this->_callHTTPCSW($getRecodsRequest)) {
                 $getRecodsRequest=null;
                 return $this->_response;
         }
         else {
             $getRecodsRequest=null;
-            throw new Exception($this->_response, "002");
+            throw new Exception($this->_response);
         }
-      }        
+	}
+
+	/**
+	 * Get records modified since date
+	 *
+	 * @param DateTime 
+	 * @return string 
+	 *
+	 * TODO: multiple requetes au lieu d'une grosse (maxRecords)
+	 */
+	public function getRecordsModifiedSince(DateTime $since, $startRecord = 1, $qtty = 1000) {
+		
+		$now = new DateTime('now');
+		
+		$getRecodsRequest = new HTTP_Request2($this->_cswAddress);
+		$getRecodsRequest->setMethod(HTTP_Request2::METHOD_POST)
+			->setHeader('Content-type: text/xml; charset=utf-8')
+			->setBody('<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?> '.
+				'<csw:GetRecords xmlns:csw="http://www.opengis.net/cat/csw/2.0.2" '.
+				'xmlns:ogc="http://www.opengis.net/ogc" service="CSW" version="2.0.2" '.
+				'resultType="results" startPosition="'.$startRecord.'" maxRecords="'.$qtty.'" '.
+				'outputFormat="application/xml" '.
+				'outputSchema="http://www.opengis.net/cat/csw/2.0.2" '.
+				'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '.
+				'xsi:schemaLocation="http://www.opengis.net/cat/csw/2.0.2 '.
+				'http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd"> '.
+ 				'<csw:Query typeNames="csw:Record"> '.
+				'	<csw:ElementSetName>full</csw:ElementSetName> '.
+				'	  <csw:Constraint version="1.1.0"> '.
+				'		 <ogc:Filter> '.
+				'		   <ogc:PropertyIsBetween> '.
+				'			 <ogc:PropertyName>dc:modified</ogc:PropertyName> '.
+				'			 <ogc:LowerBoundary> '.
+				'			   <ogc:Literal>'.$since->format('Y-m-d').'</ogc:Literal> '.
+				'			 </ogc:LowerBoundary> '.
+				'			 <ogc:UpperBoundary> '.
+				'			   <ogc:Literal>'.$now->format('Y-m-d').'</ogc:Literal> '.
+				'			 </ogc:UpperBoundary> '.
+				'		   </ogc:PropertyIsBetween> '.
+				'		 </ogc:Filter> '.
+				'	   </csw:Constraint> '.
+				'	 </csw:Query> '.
+				'</csw:GetRecords>');
+        //authentication if needed
+        //
+        if (!$this->_authentication($getRecodsRequest)) throw new Exception($this->_response);
+        if ($this->_callHTTPCSW($getRecodsRequest)) {
+                $getRecodsRequest=null;
+                return $this->_response;
+        }
+        else {
+            $getRecodsRequest=null;
+            throw new Exception($this->_response);
+        }
+	}
 
 /*
   http://localhost:8080/geonetwork/srv/en/csw?request=GetRecords
@@ -317,7 +371,7 @@ class cswGeoClient {
                                 "</csw:Query>".
                                 "</csw:GetRecords>");
             //authentication if needed
-        if (!$this->_authentication($getCountRecordsRequest)) throw new Exception($this->_response, "001");
+        if (!$this->_authentication($getCountRecordsRequest)) throw new Exception($this->_response);
         if ($this->_callHTTPCSW($getCountRecordsRequest)) {
                 $docXml= new DOMDocument();
                 if ($docXml->loadXML($this->_response)) {                    
@@ -330,12 +384,12 @@ class cswGeoClient {
                         return 0;
                 }
                 else {
-                    throw new Exception($this->_response, "004");
+                    throw new Exception($this->_response);
                 }
                 
         }
         else
-            throw new Exception($this->_response, "003");
+            throw new Exception($this->_response);
 
     }
     /**
@@ -355,7 +409,7 @@ class cswGeoClient {
 		           "</csw:Insert>".
                            "</csw:Transaction>");
         //authentication is needed !!
-        if (!$this->_authentication($insertMetadataRequest)) throw new Exception("authentication mandatory", "001");
+        if (!$this->_authentication($insertMetadataRequest)) throw new Exception("authentication mandatory");
         if ($this->_callHTTPCSW($insertMetadataRequest)) {
                 $docXml= new DOMDocument();
                 if ($docXml->loadXML($this->_response)) {
@@ -365,7 +419,7 @@ class cswGeoClient {
 					if ($nodes->length > 0) {
 						$uuids = array();
 						foreach($nodes as $node) {
-							$uuids[] = str_replace(' ', '', $node->textContent);
+							$uuids[] = trim(preg_replace('/\s+/', '', $node->textContent));
 						}
 						return $uuids;
 					}
@@ -373,11 +427,11 @@ class cswGeoClient {
                         return false;
                 }
                 else {
-                    throw new Exception($this->_response, "004");
+                    throw new Exception($this->_response);
                 }
         }
         else
-            throw new Exception($this->_response, "002");
+            throw new Exception($this->_response);
 
 
     }
@@ -396,14 +450,14 @@ class cswGeoClient {
                 $uuid = $nFI->item(0)->childNodes->item(1)->nodeValue;
         }
         else
-            throw new Exception("No fileIdentifier found","UM.001");
+            throw new Exception("No fileIdentifier found");
        
         $updateMetadataRequest = new HTTP_Request2($this->_cswAddress);
         $updateMetadataRequest->setMethod(HTTP_Request2::METHOD_POST)
                       ->setHeader('Content-type: text/xml; charset=utf-8')
 		      ->setBody("<?xml version='1.0'?>".
                            "<csw:Transaction service='CSW' version='2.0.2' xmlns:csw='http://www.opengis.net/cat/csw/2.0.2' xmlns:ogc='http://www.opengis.net/ogc' xmlns:apiso='http://www.opengis.net/cat/csw/apiso/1.0'>".
-                           "<csw:Update>".str_replace('<?xml version="1.0"?>','',$xmlISO19139->saveXML()).
+                           "<csw:Update>".str_replace('<?xml version="1.0" encoding="UTF-8"?>','',$xmlISO19139->saveXML()).
                            "<csw:Constraint version='1.0.0'>".
                            "<Filter xmlns='http://www.opengis.net/ogc' xmlns:gml='http://www.opengis.net/gml'>".
                            "<PropertyIsLike wildCard='%' singleChar='_' escapeChar='\'>".
@@ -416,7 +470,7 @@ class cswGeoClient {
                            "</csw:Transaction>");
         //authentication is needed !!
         
-        if (!$this->_authentication($updateMetadataRequest)) throw new Exception("authentication mandatory", "001");
+        if (!$this->_authentication($updateMetadataRequest)) throw new Exception("authentication mandatory");
         
         if ($this->_callHTTPCSW($updateMetadataRequest)) {
                 $docXml= new DOMDocument();
@@ -431,11 +485,11 @@ class cswGeoClient {
                         return 0;
                 }
                 else {
-                    throw new Exception($this->_response, "004");
+                    throw new Exception($this->_response);
                 }
         }
         else
-            throw new Exception($this->_response, "002");
+            throw new Exception($this->_response);
 
 
     }
@@ -454,7 +508,7 @@ class cswGeoClient {
                 return $this->deleteMetadataFromUuid($uuid);
         }
         else
-            throw new Exception("No fileIdentifier found","UM.001");
+            throw new Exception("No fileIdentifier found");
 
     }
 
@@ -484,7 +538,7 @@ class cswGeoClient {
                            "</csw:Transaction>");
         //authentication is needed !!
 
-        if (!$this->_authentication($deleteMetadataRequest)) throw new Exception("authentication mandatory", "001");
+        if (!$this->_authentication($deleteMetadataRequest)) throw new Exception("authentication mandatory");
 
         if ($this->_callHTTPCSW($deleteMetadataRequest)) {
                 $docXml= new DOMDocument();
@@ -498,11 +552,11 @@ class cswGeoClient {
                         return 0;
                 }
                 else {
-                    throw new Exception($this->_response, "004");
+                    throw new Exception($this->_response);
                 }
         }
         else
-            throw new Exception($this->_response, "002");
+            throw new Exception($this->_response);
 
 
     }
